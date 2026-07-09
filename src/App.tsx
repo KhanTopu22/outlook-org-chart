@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Users, UserPlus, Upload, Trash2, MailPlus,
-  CheckCircle2, XCircle, Check, Building2
+  CheckCircle2, XCircle, Check, Building2, Maximize
 } from 'lucide-react';
 import './index.css';
 
@@ -15,9 +15,11 @@ interface Person {
 }
 
 type TabType = 'create' | 'use';
+type ViewMode = 'department' | 'orgchart';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('use');
+  const [viewMode, setViewMode] = useState<ViewMode>('department');
   const [orgData, setOrgData] = useState<Person[]>([]);
   const [selectedPeople, setSelectedPeople] = useState<Person[]>([]);
 
@@ -166,6 +168,18 @@ export default function App() {
     }
   };
 
+  const selectDepartment = (_dept: string, peopleInDept: Person[]) => {
+    const allSelected = peopleInDept.every(p => selectedPeople.some(sp => sp.id === p.id));
+    if (allSelected) {
+      const idsToRemove = new Set(peopleInDept.map(p => p.id));
+      setSelectedPeople(selectedPeople.filter(p => !idsToRemove.has(p.id)));
+    } else {
+      const currentlySelectedIds = new Set(selectedPeople.map(p => p.id));
+      const newPeople = peopleInDept.filter(p => !currentlySelectedIds.has(p.id));
+      setSelectedPeople([...selectedPeople, ...newPeople]);
+    }
+  };
+
   // Group by department for the Use tab
   const filteredData = orgData.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -299,6 +313,27 @@ export default function App() {
 
       {activeTab === 'use' && (
         <>
+          <div className="instruction-banner">
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+              Click <Maximize size={16} /> located above in the right corner to view org chart
+            </span>
+          </div>
+
+          <div className="view-mode-toggle">
+            <button
+              className={`view-btn ${viewMode === 'department' ? 'active' : ''}`}
+              onClick={() => setViewMode('department')}
+            >
+              View by department
+            </button>
+            <button
+              className={`view-btn ${viewMode === 'orgchart' ? 'active' : ''}`}
+              onClick={() => setViewMode('orgchart')}
+            >
+              View whole org chart
+            </button>
+          </div>
+
           <div className="form-group">
             <input
               type="text"
@@ -330,39 +365,75 @@ export default function App() {
             )}
           </div>
 
-          <div className="org-chart-container">
-            {Object.keys(departments).length === 0 ? (
-              <div className="section-card">
-                <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-                  {orgData.length === 0 ? 'No directory data. Please add people first.' : 'No results found.'}
-                </p>
-              </div>
-            ) : (
-              Object.keys(departments).sort().map(dept => (
-                <div key={dept}>
-                  <div className="dept-header">{dept}</div>
-                  <div className="dept-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
-                    {departments[dept].map(person => {
-                      const isSelected = selectedPeople.some(p => p.id === person.id);
-                      return (
-                        <div
-                          key={person.id}
-                          className={`user-card ${isSelected ? 'selected' : ''}`}
-                          onClick={() => togglePersonSelection(person)}
-                        >
-                          <Check className="check-icon" size={18} />
-                          <div className="person-info">
-                            <span className="person-name">{person.name}</span>
-                            <span className="person-title">{person.title}</span>
-                            <span className="person-email">{person.email}</span>
+          <div className="org-chart-container-scroll">
+            <div className="org-chart-container">
+              {Object.keys(departments).length === 0 ? (
+                <div className="section-card">
+                  <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                    {orgData.length === 0 ? 'No directory data. Please add people first.' : 'No results found.'}
+                  </p>
+                </div>
+              ) : viewMode === 'department' ? (
+                Object.keys(departments).sort().map(dept => (
+                  <div key={dept}>
+                    <div className="dept-header clickable-header" onClick={() => selectDepartment(dept, departments[dept])}>
+                      {dept} <span className="dept-select-hint">(Click to select all)</span>
+                    </div>
+                    <div className="dept-grid">
+                      {departments[dept].map(person => {
+                        const isSelected = selectedPeople.some(p => p.id === person.id);
+                        return (
+                          <div
+                            key={person.id}
+                            className={`user-card ${isSelected ? 'selected' : ''}`}
+                            onClick={() => togglePersonSelection(person)}
+                          >
+                            <Check className="check-icon" size={18} />
+                            <div className="person-info">
+                              <span className="person-name">{person.name}</span>
+                              <span className="person-title">{person.title}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="tree-org-chart">
+                  <div className="tree-node root-node">
+                    <div className="tree-card root-card">Company</div>
+                    <div className="tree-children">
+                      {Object.keys(departments).sort().map(dept => (
+                        <div className="tree-node dept-node" key={dept}>
+                          <div className="tree-card dept-card clickable-header" onClick={() => selectDepartment(dept, departments[dept])}>
+                            {dept}
+                            <div className="dept-select-hint">(Select all)</div>
+                          </div>
+                          <div className="tree-children">
+                            {departments[dept].map(person => {
+                              const isSelected = selectedPeople.some(p => p.id === person.id);
+                              return (
+                                <div className="tree-node person-node" key={person.id}>
+                                  <div
+                                    className={`tree-card person-card ${isSelected ? 'selected' : ''}`}
+                                    onClick={() => togglePersonSelection(person)}
+                                  >
+                                    <Check className="check-icon" size={14} />
+                                    <span className="person-name">{person.name}</span>
+                                    <span className="person-title">{person.title}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                      );
-                    })}
+                      ))}
+                    </div>
                   </div>
                 </div>
-              ))
-            )}
+              )}
+            </div>
           </div>
         </>
       )}
