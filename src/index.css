@@ -435,6 +435,23 @@ body {
 .toast.error { border-left: 4px solid var(--danger); }
 .toast.info { border-left: 4px solid var(--primary); }
 
+.collapsible-title {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+.collapsible-title:hover {
+  color: var(--primary);
+}
+.collapsible-content {
+  margin-top: 16px;
+  animation: slideDown 0.3s ease;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* Custom View Enhancements */
 .instruction-banner {
   background: var(--primary-light);

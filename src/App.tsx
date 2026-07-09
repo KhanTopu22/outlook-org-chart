@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
   Users, UserPlus, Upload, Trash2, MailPlus,
-  CheckCircle2, XCircle, Check, Building2, Maximize
+  CheckCircle2, XCircle, Check, Building2, Maximize,
+  ChevronDown, ChevronRight
 } from 'lucide-react';
 import './index.css';
 
@@ -12,6 +13,7 @@ interface Person {
   title: string;
   email: string;
   department: string;
+  reportsTo?: string;
 }
 
 type TabType = 'create' | 'use';
@@ -28,8 +30,14 @@ export default function App() {
   const [title, setTitle] = useState('');
   const [email, setEmail] = useState('');
   const [department, setDepartment] = useState('');
+  const [reportsTo, setReportsTo] = useState('');
   const [importText, setImportText] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Accordion state
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isDirectoryOpen, setIsDirectoryOpen] = useState(true);
 
   // Toast state
   const [toast, setToast] = useState<{ show: boolean, message: string, type: 'success' | 'error' | 'info' }>({
@@ -72,11 +80,11 @@ export default function App() {
 
     const newPerson: Person = {
       id: Date.now().toString(),
-      name, title, email, department
+      name, title, email, department, reportsTo
     };
-
+    
     setOrgData([...orgData, newPerson]);
-    setName(''); setTitle(''); setEmail(''); setDepartment('');
+    setName(''); setTitle(''); setEmail(''); setDepartment(''); setReportsTo('');
     showToast('Person added successfully', 'success');
   };
 
@@ -101,7 +109,8 @@ export default function App() {
             name: parts[0],
             title: parts[1],
             email: pEmail,
-            department: parts[3] || 'Other'
+            department: parts[3] || 'Other',
+            reportsTo: parts[4] || ''
           });
           imported++;
         }
@@ -227,86 +236,119 @@ export default function App() {
       {activeTab === 'create' && (
         <>
           <div className="section-card">
-            <div className="section-title">Add Individual</div>
-            <div className="form-group">
-              <label className="form-label">Full Name</label>
-              <input type="text" className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="John Doe" />
+            <div className="section-title collapsible-title" onClick={() => setIsAddOpen(!isAddOpen)}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {isAddOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />} Add Individual
+              </span>
             </div>
-            <div className="form-group">
-              <label className="form-label">Job Title</label>
-              <input type="text" className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Senior Developer" />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Email Address</label>
-              <input type="email" className="form-input" value={email} onChange={e => setEmail(e.target.value)} placeholder="john@company.com" />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Department</label>
-              <select className="form-select" value={department} onChange={e => setDepartment(e.target.value)}>
-                <option value="">Select department</option>
-                <option value="Executive">Executive</option>
-                <option value="Engineering">Engineering</option>
-                <option value="Sales">Sales</option>
-                <option value="Marketing">Marketing</option>
-                <option value="HR">Human Resources</option>
-                <option value="Finance">Finance</option>
-                <option value="Operations">Operations</option>
-              </select>
-            </div>
-            <button className="btn btn-primary btn-full" onClick={addPerson}>
-              <UserPlus size={16} /> Add to Directory
-            </button>
+            {isAddOpen && (
+              <div className="collapsible-content">
+                <div className="form-group">
+                  <label className="form-label">Full Name</label>
+                  <input type="text" className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="John Doe" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Job Title</label>
+                  <input type="text" className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Senior Developer" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email Address</label>
+                  <input type="email" className="form-input" value={email} onChange={e => setEmail(e.target.value)} placeholder="john@company.com" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Department</label>
+                  <select className="form-select" value={department} onChange={e => setDepartment(e.target.value)}>
+                    <option value="">Select department</option>
+                    <option value="Executive">Executive</option>
+                    <option value="Engineering">Engineering</option>
+                    <option value="Sales">Sales</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="HR">Human Resources</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Operations">Operations</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Reports To</label>
+                  <select className="form-select" value={reportsTo} onChange={e => setReportsTo(e.target.value)}>
+                    <option value="">None</option>
+                    {orgData.map(p => (
+                      <option key={p.id} value={p.email}>{p.name} ({p.title})</option>
+                    ))}
+                  </select>
+                </div>
+                <button className="btn btn-primary btn-full" onClick={addPerson}>
+                  <UserPlus size={16} /> Add to Directory
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="section-card">
-            <div className="section-title">Import your Org Chart</div>
-            <div className="form-group">
-              <label className="form-label">Format: Name, Title, Email, Department</label>
-              <textarea
-                className="form-textarea"
-                rows={3}
-                value={importText}
-                onChange={e => setImportText(e.target.value)}
-                placeholder="Jane Doe, VP Sales, jane@company.com, Sales"
-              />
+            <div className="section-title collapsible-title" onClick={() => setIsImportOpen(!isImportOpen)}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {isImportOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />} Import your Org Chart
+              </span>
             </div>
-            <button className="btn btn-outline btn-full" onClick={importData}>
-              <Upload size={16} /> Import Data
-            </button>
+            {isImportOpen && (
+              <div className="collapsible-content">
+                <div className="form-group">
+                  <label className="form-label">
+                    <strong>Change the bold text below and paste it into the text box. Add as many more people in the format below as you need to complete your org chart.</strong>
+                  </label>
+                  <textarea
+                    className="form-textarea"
+                    rows={4}
+                    value={importText}
+                    onChange={e => setImportText(e.target.value)}
+                    placeholder="Name, Title, Email, Department, ReportsToEmail&#10;John Doe, Senior Developer, john@company.com, Engineering, sarah@company.com"
+                  />
+                </div>
+                <button className="btn btn-outline btn-full" onClick={importData}>
+                  <Upload size={16} /> Import Data
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="section-card">
-            <div className="section-title" style={{ justifyContent: 'space-between' }}>
-              <span>Directory ({orgData.length})</span>
+            <div className="section-title collapsible-title" onClick={() => setIsDirectoryOpen(!isDirectoryOpen)}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {isDirectoryOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />} Directory ({orgData.length})
+              </span>
               {orgData.length > 0 && (
-                <button className="btn btn-danger" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={clearAllData}>
+                <button className="btn btn-danger" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={(e) => { e.stopPropagation(); clearAllData(); }}>
                   Clear
                 </button>
               )}
             </div>
-
-            <div className="person-list" style={{ marginBottom: '16px' }}>
-              {orgData.length === 0 ? (
-                <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>No people in directory</p>
-              ) : (
-                orgData.map(person => (
-                  <div key={person.id} className="person-item">
-                    <div className="person-info">
-                      <span className="person-name">{person.name}</span>
-                      <span className="person-title">{person.title} {person.department ? `· ${person.department}` : ''}</span>
-                      <span className="person-email">{person.email}</span>
-                    </div>
-                    <button className="btn btn-outline" style={{ padding: '6px', color: 'var(--danger)', border: 'none' }} onClick={() => removePersonFromOrg(person.id)}>
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <button className="btn btn-success btn-full" onClick={saveOrgChart} disabled={orgData.length === 0}>
-              <CheckCircle2 size={16} /> Save Directory
-            </button>
+            
+            {isDirectoryOpen && (
+              <div className="collapsible-content">
+                <div className="person-list" style={{ marginBottom: '16px' }}>
+                  {orgData.length === 0 ? (
+                    <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>No people in directory</p>
+                  ) : (
+                    orgData.map(person => (
+                      <div key={person.id} className="person-item">
+                        <div className="person-info">
+                          <span className="person-name">{person.name}</span>
+                          <span className="person-title">{person.title} {person.department ? `· ${person.department}` : ''}</span>
+                          <span className="person-email">{person.email}</span>
+                        </div>
+                        <button className="btn btn-outline" style={{ padding: '6px', color: 'var(--danger)', border: 'none' }} onClick={() => removePersonFromOrg(person.id)}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+                
+                <button className="btn btn-success btn-full" onClick={saveOrgChart} disabled={orgData.length === 0}>
+                  <CheckCircle2 size={16} /> Save Directory
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
