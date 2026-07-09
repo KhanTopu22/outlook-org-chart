@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { 
-  Users, UserPlus, Upload, Trash2, MailPlus, 
+import {
+  Users, UserPlus, Upload, Trash2, MailPlus,
   CheckCircle2, XCircle, Check, Building2
 } from 'lucide-react';
 import './index.css';
@@ -17,10 +17,10 @@ interface Person {
 type TabType = 'create' | 'use';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabType>('create');
+  const [activeTab, setActiveTab] = useState<TabType>('use');
   const [orgData, setOrgData] = useState<Person[]>([]);
   const [selectedPeople, setSelectedPeople] = useState<Person[]>([]);
-  
+
   // Form state
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
@@ -28,7 +28,7 @@ export default function App() {
   const [department, setDepartment] = useState('');
   const [importText, setImportText] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   // Toast state
   const [toast, setToast] = useState<{ show: boolean, message: string, type: 'success' | 'error' | 'info' }>({
     show: false, message: '', type: 'info'
@@ -57,49 +57,22 @@ export default function App() {
     showToast('Organization chart saved successfully', 'success');
   };
 
-  const loadTemplate = (type: 'startup' | 'corporate') => {
-    if (orgData.length > 0 && !window.confirm('This will replace your current org chart. Continue?')) {
-      return;
-    }
-
-    let templateData: Person[] = [];
-    if (type === 'startup') {
-      templateData = [
-        {id: '1', name: 'Alex Johnson', title: 'CEO', email: 'alex@company.com', department: 'Executive'},
-        {id: '2', name: 'Sarah Chen', title: 'CTO', email: 'sarah@company.com', department: 'Engineering'},
-        {id: '3', name: 'Mike Davis', title: 'VP Sales', email: 'mike@company.com', department: 'Sales'},
-        {id: '4', name: 'Lisa Wang', title: 'Lead Developer', email: 'lisa@company.com', department: 'Engineering'},
-        {id: '5', name: 'Tom Brown', title: 'Sales Manager', email: 'tom@company.com', department: 'Sales'}
-      ];
-    } else {
-      templateData = [
-        {id: '1', name: 'Robert Smith', title: 'CEO', email: 'robert@company.com', department: 'Executive'},
-        {id: '2', name: 'David Lee', title: 'CTO', email: 'david@company.com', department: 'Engineering'},
-        {id: '3', name: 'Maria Garcia', title: 'VP Marketing', email: 'maria@company.com', department: 'Marketing'},
-        {id: '4', name: 'Anna Kim', title: 'HR Director', email: 'anna@company.com', department: 'HR'},
-        {id: '5', name: 'Chris Martinez', title: 'Operations', email: 'chris@company.com', department: 'Operations'},
-      ];
-    }
-    setOrgData(templateData);
-    showToast(`Loaded ${type} template`, 'success');
-  };
-
   const addPerson = () => {
     if (!name || !email) {
       showToast('Please enter at least name and email', 'error');
       return;
     }
-    
+
     if (orgData.some(p => p.email.toLowerCase() === email.toLowerCase())) {
       showToast('Person with this email already exists', 'error');
       return;
     }
-    
+
     const newPerson: Person = {
       id: Date.now().toString(),
       name, title, email, department
     };
-    
+
     setOrgData([...orgData, newPerson]);
     setName(''); setTitle(''); setEmail(''); setDepartment('');
     showToast('Person added successfully', 'success');
@@ -110,16 +83,16 @@ export default function App() {
       showToast('Please enter data to import', 'error');
       return;
     }
-    
+
     const lines = importText.trim().split('\n');
     let imported = 0;
     const newOrgData = [...orgData];
-    
+
     lines.forEach((line) => {
       const parts = line.split(',').map(part => part.trim());
       if (parts.length >= 2 && parts[0] && parts[1]) {
         const pEmail = parts[2] || parts[0].toLowerCase().replace(/\s+/g, '.') + '@company.com';
-        
+
         if (!newOrgData.some(p => p.email.toLowerCase() === pEmail.toLowerCase())) {
           newOrgData.push({
             id: Date.now().toString() + Math.random(),
@@ -132,7 +105,7 @@ export default function App() {
         }
       }
     });
-    
+
     if (imported > 0) {
       setOrgData(newOrgData);
       setImportText('');
@@ -194,9 +167,9 @@ export default function App() {
   };
 
   // Group by department for the Use tab
-  const filteredData = orgData.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredData = orgData.filter(p =>
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -217,18 +190,19 @@ export default function App() {
       </div>
 
       <div className="app-header">
+        <h1>OrgChartCC</h1>
         <h2>Interactive Org Chart</h2>
-        <p>Select recipients seamlessly from your organizational structure</p>
+        <p>Looping in the right people - every time!</p>
       </div>
 
       <div className="tabs-container">
-        <button 
+        <button
           className={`tab-btn ${activeTab === 'create' ? 'active' : ''}`}
           onClick={() => setActiveTab('create')}
         >
-          <Building2 size={16} /> Manage Organization
+          <Building2 size={16} /> Add to your OrgChart
         </button>
-        <button 
+        <button
           className={`tab-btn ${activeTab === 'use' ? 'active' : ''}`}
           onClick={() => setActiveTab('use')}
         >
@@ -238,16 +212,6 @@ export default function App() {
 
       {activeTab === 'create' && (
         <>
-          <div className="section-card" style={{ background: 'linear-gradient(to right, rgba(0,120,212,0.05), transparent)' }}>
-            <div className="section-title">
-              Quick Start Templates
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn btn-outline" onClick={() => loadTemplate('startup')}>Startup (5 people)</button>
-              <button className="btn btn-outline" onClick={() => loadTemplate('corporate')}>Corporate (15 people)</button>
-            </div>
-          </div>
-
           <div className="section-card">
             <div className="section-title">Add Individual</div>
             <div className="form-group">
@@ -281,15 +245,15 @@ export default function App() {
           </div>
 
           <div className="section-card">
-            <div className="section-title">Bulk Import (CSV)</div>
+            <div className="section-title">Import your Org Chart</div>
             <div className="form-group">
               <label className="form-label">Format: Name, Title, Email, Department</label>
-              <textarea 
-                className="form-textarea" 
-                rows={3} 
-                value={importText} 
+              <textarea
+                className="form-textarea"
+                rows={3}
+                value={importText}
                 onChange={e => setImportText(e.target.value)}
-                placeholder="Jane Doe, VP Sales, jane@company.com, Sales" 
+                placeholder="Jane Doe, VP Sales, jane@company.com, Sales"
               />
             </div>
             <button className="btn btn-outline btn-full" onClick={importData}>
@@ -306,7 +270,7 @@ export default function App() {
                 </button>
               )}
             </div>
-            
+
             <div className="person-list" style={{ marginBottom: '16px' }}>
               {orgData.length === 0 ? (
                 <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>No people in directory</p>
@@ -325,7 +289,7 @@ export default function App() {
                 ))
               )}
             </div>
-            
+
             <button className="btn btn-success btn-full" onClick={saveOrgChart} disabled={orgData.length === 0}>
               <CheckCircle2 size={16} /> Save Directory
             </button>
@@ -336,10 +300,10 @@ export default function App() {
       {activeTab === 'use' && (
         <>
           <div className="form-group">
-            <input 
-              type="text" 
-              className="form-input" 
-              placeholder="Search by name, title, or email..." 
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Search by name, title, or email..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               style={{ borderRadius: '24px', padding: '12px 20px', boxShadow: 'var(--shadow-sm)' }}
@@ -381,8 +345,8 @@ export default function App() {
                     {departments[dept].map(person => {
                       const isSelected = selectedPeople.some(p => p.id === person.id);
                       return (
-                        <div 
-                          key={person.id} 
+                        <div
+                          key={person.id}
                           className={`user-card ${isSelected ? 'selected' : ''}`}
                           onClick={() => togglePersonSelection(person)}
                         >

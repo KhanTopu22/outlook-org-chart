@@ -64,11 +64,18 @@ body {
   pointer-events: none;
 }
 
-.app-header h2 {
-  font-size: 20px;
-  font-weight: 600;
-  margin-bottom: 4px;
+.app-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 8px;
   letter-spacing: -0.5px;
+}
+
+.app-header h2 {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  opacity: 0.95;
 }
 
 .app-header p {
