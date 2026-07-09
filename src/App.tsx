@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Users, UserPlus, Upload, Trash2, MailPlus,
-  CheckCircle2, XCircle, Check, Building2, Maximize,
+  CheckCircle2, XCircle, Check, Building2,
   ChevronDown, ChevronRight
 } from 'lucide-react';
 import './index.css';
@@ -150,6 +150,30 @@ export default function App() {
     }
   };
 
+  const getAllDescendants = (person: Person, allData: Person[]): Person[] => {
+    const children = allData.filter(p => p.reportsTo === person.email);
+    let descendants = [...children];
+    children.forEach(child => {
+      descendants = [...descendants, ...getAllDescendants(child, allData)];
+    });
+    return descendants;
+  };
+
+  const toggleChainSelection = (person: Person) => {
+    const descendants = getAllDescendants(person, orgData);
+    const family = [person, ...descendants];
+    const familyIds = new Set(family.map(p => p.id));
+    const allSelected = family.every(p => selectedPeople.some(sp => sp.id === p.id));
+    
+    if (allSelected) {
+      setSelectedPeople(selectedPeople.filter(p => !familyIds.has(p.id)));
+    } else {
+      const currentlySelectedIds = new Set(selectedPeople.map(p => p.id));
+      const newPeople = family.filter(p => !currentlySelectedIds.has(p.id));
+      setSelectedPeople([...selectedPeople, ...newPeople]);
+    }
+  };
+
   const addToEmail = () => {
     if (selectedPeople.length === 0) {
       showToast('No recipients selected', 'error');
@@ -293,15 +317,12 @@ export default function App() {
             {isImportOpen && (
               <div className="collapsible-content">
                 <div className="form-group">
-                  <label className="form-label">
-                    <strong>Change the bold text below and paste it into the text box. Add as many more people in the format below as you need to complete your org chart.</strong>
-                  </label>
                   <textarea
                     className="form-textarea"
-                    rows={4}
+                    rows={8}
                     value={importText}
                     onChange={e => setImportText(e.target.value)}
-                    placeholder="Name, Title, Email, Department, ReportsToEmail&#10;John Doe, Senior Developer, john@company.com, Engineering, sarah@company.com"
+                    placeholder="Alice, CEO, ceo@gameco.com, Executive, &#10;Bob, Office Manager, admin@gameco.com, Administration, ceo@gameco.com&#10;Charlie, Art Director, art@gameco.com, Artwork Creation, ceo@gameco.com&#10;Dave, Dir. of Technology, tech@gameco.com, Programming, ceo@gameco.com&#10;Eve, Dir. of Operations, ops@gameco.com, Production, ceo@gameco.com&#10;Frank, Lead Artist, leadart@gameco.com, Artwork Creation, art@gameco.com&#10;Grace, Gameplay Programmer, dev@gameco.com, Programming, tech@gameco.com"
                   />
                 </div>
                 <button className="btn btn-outline btn-full" onClick={importData}>
@@ -355,12 +376,6 @@ export default function App() {
 
       {activeTab === 'use' && (
         <>
-          <div className="instruction-banner">
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
-              Click <Maximize size={16} /> located above in the right corner to view org chart
-            </span>
-          </div>
-
           <div className="view-mode-toggle">
             <button
               className={`view-btn ${viewMode === 'department' ? 'active' : ''}`}
@@ -446,31 +461,31 @@ export default function App() {
                   <div className="tree-node root-node">
                     <div className="tree-card root-card">Company</div>
                     <div className="tree-children">
-                      {Object.keys(departments).sort().map(dept => (
-                        <div className="tree-node dept-node" key={dept}>
-                          <div className="tree-card dept-card clickable-header" onClick={() => selectDepartment(dept, departments[dept])}>
-                            {dept}
-                            <div className="dept-select-hint">(Select all)</div>
-                          </div>
-                          <div className="tree-children">
-                            {departments[dept].map(person => {
-                              const isSelected = selectedPeople.some(p => p.id === person.id);
-                              return (
-                                <div className="tree-node person-node" key={person.id}>
-                                  <div
-                                    className={`tree-card person-card ${isSelected ? 'selected' : ''}`}
-                                    onClick={() => togglePersonSelection(person)}
-                                  >
-                                    <Check className="check-icon" size={14} />
-                                    <span className="person-name">{person.name}</span>
-                                    <span className="person-title">{person.title}</span>
-                                  </div>
+                      {orgData.filter(p => !p.reportsTo || !orgData.some(other => other.email === p.reportsTo)).map(root => {
+                        const renderTree = (person: Person) => {
+                          const children = orgData.filter(p => p.reportsTo === person.email);
+                          const isSelected = selectedPeople.some(p => p.id === person.id);
+                          return (
+                            <div className="tree-node person-node" key={person.id}>
+                              <div
+                                className={`tree-card person-card ${isSelected ? 'selected' : ''}`}
+                                onClick={() => toggleChainSelection(person)}
+                              >
+                                <Check className="check-icon" size={14} />
+                                <span className="person-name">{person.name}</span>
+                                <span className="person-title">{person.title}</span>
+                                {children.length > 0 && <span className="dept-select-hint">(Select team)</span>}
+                              </div>
+                              {children.length > 0 && (
+                                <div className="tree-children">
+                                  {children.map(child => renderTree(child))}
                                 </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
+                              )}
+                            </div>
+                          );
+                        };
+                        return renderTree(root);
+                      })}
                     </div>
                   </div>
                 </div>

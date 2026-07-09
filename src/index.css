@@ -647,37 +647,6 @@ body {
   margin: 0;
 }
 
-.dept-node > .tree-children {
-  flex-direction: column;
-  gap: 12px;
-  padding-top: 16px;
-  align-items: center;
-}
-
-.dept-node > .tree-children::before {
-  display: none;
-}
-
-.dept-node > .tree-children::after {
-  content: '';
-  position: absolute;
-  top: -8px;
-  left: 50%;
-  width: 2px;
-  height: calc(100% - 20px);
-  background: #ccc;
-  transform: translateX(-50%);
-  z-index: 0;
-}
-
-.dept-node > .tree-children > .tree-node {
-  padding-top: 0;
-}
-
-.dept-node > .tree-children > .tree-node::before,
-.dept-node > .tree-children > .tree-node::after {
-  display: none;
-}
 
 .person-card {
   cursor: pointer;
