@@ -4,6 +4,7 @@ import {
   CheckCircle2, XCircle, Check, Building2,
   ChevronDown, ChevronRight
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import './index.css';
 
 // Types
@@ -125,6 +126,78 @@ export default function App() {
       showToast(`Imported ${imported} people`, 'success');
     } else {
       showToast('No valid new data to import', 'error');
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      const fileName = file.name.toLowerCase();
+      
+      if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const data = new Uint8Array(event.target?.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            
+            // Convert to JSON array
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' }) as any[];
+            
+            let importedCount = 0;
+            const newOrgData = [...orgData];
+            
+            jsonData.forEach(row => {
+              // Standardize column names (allow lowercase/spaces in headers)
+              const getCol = (names: string[]) => {
+                const key = Object.keys(row).find(k => names.some(n => k.toLowerCase().replace(/\s+/g, '') === n.toLowerCase()));
+                return key ? row[key] : '';
+              };
+              
+              const name = getCol(['name', 'fullname', 'employee']);
+              const title = getCol(['title', 'jobtitle', 'position', 'role']);
+              let pEmail = getCol(['email', 'emailaddress']);
+              const department = getCol(['department', 'dept', 'team']);
+              const reportsTo = getCol(['reportstoemail', 'manager', 'manageremail', 'reportsto']);
+              
+              if (name) {
+                if (!pEmail) {
+                  pEmail = String(name).toLowerCase().replace(/\s+/g, '.') + '@company.com';
+                }
+                
+                // Avoid duplicates
+                if (!newOrgData.some(p => p.email.toLowerCase() === String(pEmail).toLowerCase())) {
+                  newOrgData.push({
+                    id: Date.now().toString() + Math.random(),
+                    name: String(name),
+                    title: String(title),
+                    email: String(pEmail),
+                    department: String(department) || 'Other',
+                    reportsTo: String(reportsTo)
+                  });
+                  importedCount++;
+                }
+              }
+            });
+            
+            if (importedCount > 0) {
+              setOrgData(newOrgData);
+              showToast(`Successfully imported ${importedCount} people from ${file.name}`, 'success');
+            } else {
+              showToast('No new valid entries found in the file.', 'error');
+            }
+          } catch (err) {
+            console.error(err);
+            showToast('Error parsing file. Please make sure it matches the template.', 'error');
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } else {
+         showToast(`File ${file.name} format parsing is limited to Excel/CSV right now. Word/Visio parsing coming soon.`, 'info');
+      }
+      e.target.value = '';
     }
   };
 
@@ -387,13 +460,7 @@ export default function App() {
                     accept=".xlsx, .xls, .docx, .doc, .vsdx, .csv" 
                     className="form-input" 
                     style={{ padding: '10px' }}
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        const file = e.target.files[0];
-                        showToast(`File ${file.name} received. Full parsing will be supported soon.`, 'info');
-                        e.target.value = '';
-                      }
-                    }} 
+                    onChange={handleFileUpload} 
                   />
                   <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>Upload your existing organization charts to import automatically.</p>
                 </div>
