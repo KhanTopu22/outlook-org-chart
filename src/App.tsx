@@ -23,7 +23,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('use');
   const [viewMode, setViewMode] = useState<ViewMode>('department');
   const [orgData, setOrgData] = useState<Person[]>([]);
-  const [selectedPeople, setSelectedPeople] = useState<Person[]>([]);
+  const [selectedTo, setSelectedTo] = useState<Person[]>([]);
+  const [selectedCc, setSelectedCc] = useState<Person[]>([]);
+  const [ccAncestors, setCcAncestors] = useState(true);
 
   // Form state
   const [name, setName] = useState('');
@@ -129,87 +131,135 @@ export default function App() {
   const removePersonFromOrg = (id: string | number) => {
     if (window.confirm('Are you sure you want to remove this person?')) {
       setOrgData(orgData.filter(p => p.id !== id));
-      setSelectedPeople(selectedPeople.filter(p => p.id !== id));
+      setSelectedTo(selectedTo.filter(p => p.id !== id));
+      setSelectedCc(selectedCc.filter(p => p.id !== id));
     }
   };
 
   const clearAllData = () => {
     if (window.confirm('Are you sure you want to clear all data?')) {
       setOrgData([]);
-      setSelectedPeople([]);
+      setSelectedTo([]);
+      setSelectedCc([]);
       localStorage.removeItem('orgChartData');
       showToast('All data cleared', 'info');
     }
   };
 
-  const togglePersonSelection = (person: Person) => {
-    if (selectedPeople.some(p => p.id === person.id)) {
-      setSelectedPeople(selectedPeople.filter(p => p.id !== person.id));
-    } else {
-      setSelectedPeople([...selectedPeople, person]);
-    }
+  const getAllAncestors = (person: Person, allData: Person[]): Person[] => {
+    if (!person.reportsTo) return [];
+    const manager = allData.find(p => p.email === person.reportsTo);
+    if (!manager) return [];
+    return [manager, ...getAllAncestors(manager, allData)];
   };
 
-  const getAllDescendants = (person: Person, allData: Person[]): Person[] => {
-    const children = allData.filter(p => p.reportsTo === person.email);
-    let descendants = [...children];
-    children.forEach(child => {
-      descendants = [...descendants, ...getAllDescendants(child, allData)];
-    });
-    return descendants;
-  };
-
-  const toggleChainSelection = (person: Person) => {
-    const descendants = getAllDescendants(person, orgData);
-    const family = [person, ...descendants];
-    const familyIds = new Set(family.map(p => p.id));
-    const allSelected = family.every(p => selectedPeople.some(sp => sp.id === p.id));
-    
-    if (allSelected) {
-      setSelectedPeople(selectedPeople.filter(p => !familyIds.has(p.id)));
+  const handlePersonClick = (person: Person, listType?: 'to' | 'cc') => {
+    if (listType === 'to') {
+      setSelectedTo(selectedTo.filter(p => p.id !== person.id));
+    } else if (listType === 'cc') {
+      setSelectedCc(selectedCc.filter(p => p.id !== person.id));
     } else {
-      const currentlySelectedIds = new Set(selectedPeople.map(p => p.id));
-      const newPeople = family.filter(p => !currentlySelectedIds.has(p.id));
-      setSelectedPeople([...selectedPeople, ...newPeople]);
+      const inTo = selectedTo.some(p => p.id === person.id);
+      const inCc = selectedCc.some(p => p.id === person.id);
+      
+      if (inTo || inCc) {
+        setSelectedTo(selectedTo.filter(p => p.id !== person.id));
+        setSelectedCc(selectedCc.filter(p => p.id !== person.id));
+      } else {
+        setSelectedTo([...selectedTo, person]);
+        if (ccAncestors) {
+          const ancestors = getAllAncestors(person, orgData);
+          const newCc = ancestors.filter(a => 
+            !selectedCc.some(c => c.id === a.id) && 
+            !selectedTo.some(t => t.id === a.id)
+          );
+          setSelectedCc([...selectedCc, ...newCc]);
+        }
+      }
     }
   };
 
   const addToEmail = () => {
-    if (selectedPeople.length === 0) {
+    if (selectedTo.length === 0 && selectedCc.length === 0) {
       showToast('No recipients selected', 'error');
       return;
     }
 
-    const recipients = selectedPeople.map(p => ({
+    const toRecipients = selectedTo.map(p => ({
+      displayName: p.name,
+      emailAddress: p.email
+    }));
+    
+    const ccRecipients = selectedCc.map(p => ({
       displayName: p.name,
       emailAddress: p.email
     }));
 
     if (window.Office && window.Office.context && window.Office.context.mailbox) {
-      window.Office.context.mailbox.item.to.addAsync(recipients, (result: any) => {
-        if (result.status === window.Office.AsyncResultStatus.Succeeded) {
-          showToast(`Added ${selectedPeople.length} recipients to email`, 'success');
-          setSelectedPeople([]);
-        } else {
-          showToast('Error adding recipients. Please try again.', 'error');
+      const item = window.Office.context.mailbox.item;
+      
+      let addedTo = false;
+      let addedCc = false;
+      
+      const checkCompletion = () => {
+        if ((toRecipients.length === 0 || addedTo) && (ccRecipients.length === 0 || addedCc)) {
+          showToast(`Added ${toRecipients.length} TO and ${ccRecipients.length} CC recipients`, 'success');
+          setSelectedTo([]);
+          setSelectedCc([]);
         }
-      });
+      };
+
+      if (toRecipients.length > 0) {
+        item.to.addAsync(toRecipients, (result: any) => {
+          if (result.status === window.Office.AsyncResultStatus.Succeeded) {
+             addedTo = true;
+             checkCompletion();
+          } else {
+             showToast('Error adding TO recipients', 'error');
+          }
+        });
+      }
+      
+      if (ccRecipients.length > 0) {
+        item.cc.addAsync(ccRecipients, (result: any) => {
+          if (result.status === window.Office.AsyncResultStatus.Succeeded) {
+             addedCc = true;
+             checkCompletion();
+          } else {
+             showToast('Error adding CC recipients', 'error');
+          }
+        });
+      }
     } else {
       // Not running in Outlook
-      showToast(`(Simulation) Added ${selectedPeople.length} recipients to email`, 'success');
-      setSelectedPeople([]);
+      showToast(`(Simulation) Added ${toRecipients.length} TO and ${ccRecipients.length} CC recipients`, 'success');
+      setSelectedTo([]);
+      setSelectedCc([]);
     }
   };
 
   const selectDepartment = (_dept: string, peopleInDept: Person[]) => {
-    const allSelected = peopleInDept.every(p => selectedPeople.some(sp => sp.id === p.id));
+    const allSelected = peopleInDept.every(p => selectedTo.some(sp => sp.id === p.id));
     if (allSelected) {
       const idsToRemove = new Set(peopleInDept.map(p => p.id));
-      setSelectedPeople(selectedPeople.filter(p => !idsToRemove.has(p.id)));
+      setSelectedTo(selectedTo.filter(p => !idsToRemove.has(p.id)));
+      setSelectedCc(selectedCc.filter(p => !idsToRemove.has(p.id)));
     } else {
-      const currentlySelectedIds = new Set(selectedPeople.map(p => p.id));
+      const currentlySelectedIds = new Set(selectedTo.map(p => p.id));
       const newPeople = peopleInDept.filter(p => !currentlySelectedIds.has(p.id));
-      setSelectedPeople([...selectedPeople, ...newPeople]);
+      setSelectedTo([...selectedTo, ...newPeople]);
+      
+      if (ccAncestors) {
+        const allAncestors = newPeople.flatMap(p => getAllAncestors(p, orgData));
+        const uniqueAncestors = Array.from(new Map(allAncestors.map(a => [a.id, a])).values());
+        
+        const newCc = uniqueAncestors.filter(a => 
+          !selectedCc.some(c => c.id === a.id) && 
+          !selectedTo.some(t => t.id === a.id) &&
+          !newPeople.some(np => np.id === a.id)
+        );
+        setSelectedCc(prev => [...prev, ...newCc]);
+      }
     }
   };
 
@@ -316,18 +366,37 @@ export default function App() {
             </div>
             {isImportOpen && (
               <div className="collapsible-content">
+                <div style={{ marginBottom: '12px', fontSize: '13px', fontWeight: '500' }}>Option 1: Paste text data (CSV format)</div>
                 <div className="form-group">
                   <textarea
                     className="form-textarea"
-                    rows={8}
+                    rows={6}
                     value={importText}
                     onChange={e => setImportText(e.target.value)}
-                    placeholder="Alice, CEO, ceo@gameco.com, Executive, &#10;Bob, Office Manager, admin@gameco.com, Administration, ceo@gameco.com&#10;Charlie, Art Director, art@gameco.com, Artwork Creation, ceo@gameco.com&#10;Dave, Dir. of Technology, tech@gameco.com, Programming, ceo@gameco.com&#10;Eve, Dir. of Operations, ops@gameco.com, Production, ceo@gameco.com&#10;Frank, Lead Artist, leadart@gameco.com, Artwork Creation, art@gameco.com&#10;Grace, Gameplay Programmer, dev@gameco.com, Programming, tech@gameco.com"
+                    placeholder="Name, Title, Email, Department, ReportsToEmail"
                   />
                 </div>
-                <button className="btn btn-outline btn-full" onClick={importData}>
-                  <Upload size={16} /> Import Data
+                <button className="btn btn-outline btn-full" onClick={importData} style={{ marginBottom: '24px' }}>
+                  <Upload size={16} /> Import Text Data
                 </button>
+
+                <div style={{ marginBottom: '12px', fontSize: '13px', fontWeight: '500' }}>Option 2: Upload file (Excel, Word, Visio)</div>
+                <div className="form-group">
+                  <input 
+                    type="file" 
+                    accept=".xlsx, .xls, .docx, .doc, .vsdx, .csv" 
+                    className="form-input" 
+                    style={{ padding: '10px' }}
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        const file = e.target.files[0];
+                        showToast(`File ${file.name} received. Full parsing will be supported soon.`, 'info');
+                        e.target.value = '';
+                      }
+                    }} 
+                  />
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>Upload your existing organization charts to import automatically.</p>
+                </div>
               </div>
             )}
           </div>
@@ -390,6 +459,19 @@ export default function App() {
               View whole org chart
             </button>
           </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', padding: '0 4px' }}>
+            <input 
+              type="checkbox" 
+              id="ccAncestors" 
+              checked={ccAncestors} 
+              onChange={e => setCcAncestors(e.target.checked)} 
+              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+            />
+            <label htmlFor="ccAncestors" style={{ fontSize: '14px', cursor: 'pointer', userSelect: 'none' }}>
+              CC everyone above the position
+            </label>
+          </div>
 
           <div className="form-group">
             <input
@@ -402,23 +484,29 @@ export default function App() {
             />
           </div>
 
-          {selectedPeople.length > 0 && (
+          {(selectedTo.length > 0 || selectedCc.length > 0) && (
             <div className="selected-tags-container">
-              {selectedPeople.map(person => (
-                <div key={`sel-${person.id}`} className="selected-tag">
-                  {person.name}
-                  <button onClick={() => togglePersonSelection(person)}><XCircle size={14} /></button>
+              {selectedTo.map(person => (
+                <div key={`sel-to-${person.id}`} className="selected-tag to-tag">
+                  <span style={{ fontWeight: 'bold', marginRight: '4px' }}>To:</span> {person.name}
+                  <button onClick={() => handlePersonClick(person, 'to')}><XCircle size={14} /></button>
+                </div>
+              ))}
+              {selectedCc.map(person => (
+                <div key={`sel-cc-${person.id}`} className="selected-tag cc-tag">
+                  <span style={{ fontWeight: 'bold', marginRight: '4px' }}>Cc:</span> {person.name}
+                  <button onClick={() => handlePersonClick(person, 'cc')}><XCircle size={14} /></button>
                 </div>
               ))}
             </div>
           )}
 
           <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-            <button className="btn btn-primary btn-full" onClick={addToEmail} disabled={selectedPeople.length === 0}>
-              <MailPlus size={16} /> Add to Email ({selectedPeople.length})
+            <button className="btn btn-primary btn-full" onClick={addToEmail} disabled={selectedTo.length === 0 && selectedCc.length === 0}>
+              <MailPlus size={16} /> Add to Email ({selectedTo.length + selectedCc.length})
             </button>
-            {selectedPeople.length > 0 && (
-              <button className="btn btn-outline" onClick={() => setSelectedPeople([])}>Clear</button>
+            {(selectedTo.length > 0 || selectedCc.length > 0) && (
+              <button className="btn btn-outline" onClick={() => { setSelectedTo([]); setSelectedCc([]); }}>Clear</button>
             )}
           </div>
 
@@ -438,12 +526,12 @@ export default function App() {
                     </div>
                     <div className="dept-grid">
                       {departments[dept].map(person => {
-                        const isSelected = selectedPeople.some(p => p.id === person.id);
+                        const isSelected = selectedTo.some(p => p.id === person.id) || selectedCc.some(p => p.id === person.id);
                         return (
                           <div
                             key={person.id}
                             className={`user-card ${isSelected ? 'selected' : ''}`}
-                            onClick={() => togglePersonSelection(person)}
+                            onClick={() => handlePersonClick(person)}
                           >
                             <Check className="check-icon" size={18} />
                             <div className="person-info">
@@ -464,12 +552,12 @@ export default function App() {
                       {orgData.filter(p => !p.reportsTo || !orgData.some(other => other.email === p.reportsTo)).map(root => {
                         const renderTree = (person: Person) => {
                           const children = orgData.filter(p => p.reportsTo === person.email);
-                          const isSelected = selectedPeople.some(p => p.id === person.id);
+                          const isSelected = selectedTo.some(p => p.id === person.id) || selectedCc.some(p => p.id === person.id);
                           return (
                             <div className="tree-node person-node" key={person.id}>
                               <div
                                 className={`tree-card person-card ${isSelected ? 'selected' : ''}`}
-                                onClick={() => toggleChainSelection(person)}
+                                onClick={() => handlePersonClick(person)}
                               >
                                 <Check className="check-icon" size={14} />
                                 <span className="person-name">{person.name}</span>
