@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Users, UserPlus, Upload, Trash2, MailPlus,
   CheckCircle2, XCircle, Check, Building2,
-  ChevronDown, ChevronRight
+  ChevronDown, ChevronRight, Star, History
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import './index.css';
@@ -37,6 +37,10 @@ export default function App() {
   const [importText, setImportText] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Favorites & Recents state
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [recentContacts, setRecentContacts] = useState<string[]>([]);
+
   // Accordion state
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -56,7 +60,31 @@ export default function App() {
         console.error("Failed to parse saved org chart data");
       }
     }
+    const savedFavorites = localStorage.getItem('orgChartFavorites');
+    if (savedFavorites) {
+      try {
+        setFavorites(JSON.parse(savedFavorites));
+      } catch (e) {
+        console.error("Failed to parse saved favorites");
+      }
+    }
+    const savedRecents = localStorage.getItem('orgChartRecents');
+    if (savedRecents) {
+      try {
+        setRecentContacts(JSON.parse(savedRecents));
+      } catch (e) {
+        console.error("Failed to parse saved recents");
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('orgChartFavorites', JSON.stringify(favorites));
+  }, [favorites]);
+
+  useEffect(() => {
+    localStorage.setItem('orgChartRecents', JSON.stringify(recentContacts));
+  }, [recentContacts]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ show: true, message, type });
@@ -226,7 +254,24 @@ export default function App() {
     return [manager, ...getAllAncestors(manager, allData)];
   };
 
+  const toggleFavorite = (e: React.MouseEvent, email: string) => {
+    e.stopPropagation();
+    if (favorites.includes(email)) {
+      setFavorites(favorites.filter(f => f !== email));
+    } else {
+      setFavorites([...favorites, email]);
+    }
+  };
+
+  const trackRecentAccess = (email: string) => {
+    setRecentContacts(prev => {
+      const filtered = prev.filter(e => e !== email);
+      return [email, ...filtered].slice(0, 8); // Keep up to 8 recent contacts
+    });
+  };
+
   const handlePersonClick = (person: Person, listType?: 'to' | 'cc') => {
+    trackRecentAccess(person.email);
     if (listType === 'to') {
       setSelectedTo(selectedTo.filter(p => p.id !== person.id));
     } else if (listType === 'cc') {
@@ -551,6 +596,62 @@ export default function App() {
             />
           </div>
 
+          {/* Quick Access Section */}
+          {(favorites.length > 0 || recentContacts.length > 0) && (
+            <div className="quick-access-section">
+              {favorites.length > 0 && (
+                <div className="quick-access-group">
+                  <div className="quick-access-title"><Star size={14} className="icon-gold" /> Favorites</div>
+                  <div className="quick-access-list">
+                    {favorites.map(email => {
+                      const person = orgData.find(p => p.email === email);
+                      if (!person) return null;
+                      const isSelected = selectedTo.some(p => p.id === person.id) || selectedCc.some(p => p.id === person.id);
+                      return (
+                        <div key={`fav-${person.id}`} className={`quick-person-card ${isSelected ? 'selected' : ''}`} onClick={() => handlePersonClick(person)}>
+                          <div className="quick-person-avatar">{person.name.charAt(0)}</div>
+                          <div className="quick-person-info">
+                            <span className="name">{person.name}</span>
+                            <span className="title">{person.title}</span>
+                          </div>
+                          <button className="favorite-btn active" onClick={(e) => toggleFavorite(e, person.email)}>
+                            <Star size={14} fill="currentColor" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {recentContacts.length > 0 && (
+                <div className="quick-access-group">
+                  <div className="quick-access-title"><History size={14} /> Recently Used</div>
+                  <div className="quick-access-list">
+                    {recentContacts.map(email => {
+                      const person = orgData.find(p => p.email === email);
+                      if (!person) return null;
+                      const isSelected = selectedTo.some(p => p.id === person.id) || selectedCc.some(p => p.id === person.id);
+                      const isFav = favorites.includes(person.email);
+                      return (
+                        <div key={`rec-${person.id}`} className={`quick-person-card ${isSelected ? 'selected' : ''}`} onClick={() => handlePersonClick(person)}>
+                          <div className="quick-person-avatar">{person.name.charAt(0)}</div>
+                          <div className="quick-person-info">
+                            <span className="name">{person.name}</span>
+                            <span className="title">{person.title}</span>
+                          </div>
+                          <button className={`favorite-btn ${isFav ? 'active' : ''}`} onClick={(e) => toggleFavorite(e, person.email)}>
+                            <Star size={14} fill={isFav ? "currentColor" : "none"} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {(selectedTo.length > 0 || selectedCc.length > 0) && (
             <div className="selected-tags-container">
               {selectedTo.map(person => (
@@ -601,6 +702,9 @@ export default function App() {
                             onClick={() => handlePersonClick(person)}
                           >
                             <Check className="check-icon" size={18} />
+                            <button className={`card-fav-btn ${favorites.includes(person.email) ? 'active' : ''}`} onClick={(e) => toggleFavorite(e, person.email)}>
+                              <Star size={14} fill={favorites.includes(person.email) ? "currentColor" : "none"} />
+                            </button>
                             <div className="person-info">
                               <span className="person-name">{person.name}</span>
                               <span className="person-title">{person.title}</span>
@@ -627,6 +731,9 @@ export default function App() {
                                 onClick={() => handlePersonClick(person)}
                               >
                                 <Check className="check-icon" size={14} />
+                                <button className={`card-fav-btn ${favorites.includes(person.email) ? 'active' : ''}`} onClick={(e) => toggleFavorite(e, person.email)}>
+                                  <Star size={14} fill={favorites.includes(person.email) ? "currentColor" : "none"} />
+                                </button>
                                 <span className="person-name">{person.name}</span>
                                 <span className="person-title">{person.title}</span>
                                 {children.length > 0 && <span className="dept-select-hint">(Select team)</span>}

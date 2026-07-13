@@ -733,3 +733,163 @@ body {
   color: var(--text-muted);
   line-height: 1.2;
 }
+
+/* Quick Access Styles */
+.quick-access-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.quick-access-group {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.quick-access-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.icon-gold {
+  color: #eab308;
+}
+
+.quick-access-list {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.quick-access-list::-webkit-scrollbar {
+  height: 6px;
+}
+
+.quick-access-list::-webkit-scrollbar-thumb {
+  background: #c8c6c4;
+  border-radius: 4px;
+}
+
+.quick-person-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  cursor: pointer;
+  min-width: fit-content;
+  transition: all 0.2s ease;
+  position: relative;
+  padding-right: 36px; /* Room for star btn */
+}
+
+.quick-person-card:hover {
+  background: #f3f2f1;
+  border-color: #c8c6c4;
+}
+
+.quick-person-card.selected {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+
+.quick-person-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.quick-person-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.quick-person-info .name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.2;
+}
+
+.quick-person-info .title {
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+/* Favorite Buttons */
+.favorite-btn, .card-fav-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #c8c6c4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 4px;
+  border-radius: 50%;
+}
+
+.favorite-btn:hover, .card-fav-btn:hover {
+  background: rgba(0,0,0,0.05);
+  color: #eab308;
+}
+
+.favorite-btn.active, .card-fav-btn.active {
+  color: #eab308;
+}
+
+.quick-person-card .favorite-btn {
+  position: absolute;
+  right: 6px;
+}
+
+/* Position star button in user cards */
+.user-card .card-fav-btn {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 2;
+  opacity: 0;
+}
+
+.user-card:hover .card-fav-btn,
+.user-card .card-fav-btn.active {
+  opacity: 1;
+}
+
+.person-card .card-fav-btn {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 2;
+  opacity: 0;
+}
+
+.person-card:hover .card-fav-btn,
+.person-card .card-fav-btn.active {
+  opacity: 1;
+}
+
