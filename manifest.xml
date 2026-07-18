@@ -11,8 +11,8 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Interactive Org Chart"/>
   <Description DefaultValue="Create and use interactive organizational charts"/>
-  <IconUrl DefaultValue="https://raw.githubusercontent.com/OfficeDev/office-js-snippets/prod/assets/icon-32.png"/>
-  <HighResolutionIconUrl DefaultValue="https://raw.githubusercontent.com/OfficeDev/office-js-snippets/prod/assets/icon-80.png"/>
+  <IconUrl DefaultValue="https://khantopu22.github.io/outlook-org-chart/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://khantopu22.github.io/outlook-org-chart/assets/icon-80.png"/>
   <SupportUrl DefaultValue="https://github.com/KhanTopu22/outlook-org-chart/issues"/>
   <AppDomains>
     <AppDomain>https://khantopu22.github.io</AppDomain>
@@ -102,9 +102,9 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://raw.githubusercontent.com/OfficeDev/office-js-snippets/prod/assets/icon-16.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://raw.githubusercontent.com/OfficeDev/office-js-snippets/prod/assets/icon-32.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://raw.githubusercontent.com/OfficeDev/office-js-snippets/prod/assets/icon-80.png"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://khantopu22.github.io/outlook-org-chart/assets/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://khantopu22.github.io/outlook-org-chart/assets/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://khantopu22.github.io/outlook-org-chart/assets/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Commands.Url" DefaultValue="https://khantopu22.github.io/outlook-org-chart/commands.html"/>
