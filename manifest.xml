@@ -7,13 +7,13 @@
   xsi:type="MailApp">
   <Id>b2d99d3e-9086-4f4e-a131-7e8e5f2e8250</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>Outlook Org Chart</ProviderName>
+  <ProviderName>Shai Spetgang</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Interactive Org Chart"/>
   <Description DefaultValue="Create and use interactive organizational charts"/>
   <IconUrl DefaultValue="https://raw.githubusercontent.com/OfficeDev/office-js-snippets/prod/assets/icon-32.png"/>
   <HighResolutionIconUrl DefaultValue="https://raw.githubusercontent.com/OfficeDev/office-js-snippets/prod/assets/icon-80.png"/>
-  <SupportUrl DefaultValue="https://khantopu22.github.io/outlook-org-chart/"/>
+  <SupportUrl DefaultValue="https://github.com/KhanTopu22/outlook-org-chart/issues"/>
   <AppDomains>
     <AppDomain>https://khantopu22.github.io</AppDomain>
   </AppDomains>
