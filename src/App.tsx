@@ -62,6 +62,9 @@ export default function App() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isDirectoryOpen, setIsDirectoryOpen] = useState(true);
 
+  // Outlook blocks window.confirm, so removals are confirmed inline
+  const [pendingRemoval, setPendingRemoval] = useState<Person['id'] | 'all' | null>(null);
+
   // Toast state
   const [toast, setToast] = useState<{ show: boolean, message: string, type: 'success' | 'error' | 'info' }>({
     show: false, message: '', type: 'info'
@@ -229,21 +232,26 @@ export default function App() {
   };
 
   const removePersonFromOrg = (id: string | number) => {
-    if (window.confirm('Are you sure you want to remove this person?')) {
-      setOrgData(orgData.filter(p => p.id !== id));
-      setSelectedTo(selectedTo.filter(p => p.id !== id));
-      setSelectedCc(selectedCc.filter(p => p.id !== id));
-    }
+    setOrgData(orgData.filter(p => p.id !== id));
+    setSelectedTo(selectedTo.filter(p => p.id !== id));
+    setSelectedCc(selectedCc.filter(p => p.id !== id));
+    setPendingRemoval(null);
   };
 
   const clearAllData = () => {
-    if (window.confirm('Are you sure you want to clear all data?')) {
-      setOrgData([]);
-      setSelectedTo([]);
-      setSelectedCc([]);
-      showToast('All data cleared', 'info');
-    }
+    setOrgData([]);
+    setSelectedTo([]);
+    setSelectedCc([]);
+    setPendingRemoval(null);
+    showToast('All data cleared', 'info');
   };
+
+  const confirmButtons = (label: string, onConfirm: () => void) => (
+    <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+      <button className="btn btn-danger" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={onConfirm}>{label}</button>
+      <button className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setPendingRemoval(null)}>Cancel</button>
+    </div>
+  );
 
   const getAllAncestors = (person: Person, allData: Person[]): Person[] => {
     const ancestors: Person[] = [];
@@ -538,11 +546,11 @@ export default function App() {
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {isDirectoryOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />} Directory ({orgData.length})
               </span>
-              {orgData.length > 0 && (
-                <button className="btn btn-danger" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={(e) => { e.stopPropagation(); clearAllData(); }}>
+              {orgData.length > 0 && (pendingRemoval === 'all' ? confirmButtons('Clear all', clearAllData) : (
+                <button className="btn btn-danger" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={(e) => { e.stopPropagation(); setPendingRemoval('all'); }}>
                   Clear
                 </button>
-              )}
+              ))}
             </div>
             
             {isDirectoryOpen && (
@@ -558,9 +566,11 @@ export default function App() {
                           <span className="person-title">{person.title} {person.department ? `· ${person.department}` : ''}</span>
                           <span className="person-email">{person.email}</span>
                         </div>
-                        <button className="btn btn-outline" style={{ padding: '6px', color: 'var(--danger)', border: 'none' }} onClick={() => removePersonFromOrg(person.id)}>
-                          <Trash2 size={16} />
-                        </button>
+                        {pendingRemoval === person.id ? confirmButtons('Delete', () => removePersonFromOrg(person.id)) : (
+                          <button className="btn btn-outline" style={{ padding: '6px', color: 'var(--danger)', border: 'none' }} onClick={() => setPendingRemoval(person.id)}>
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     ))
                   )}
