@@ -1,0 +1,6 @@
+Name,Title,Email,Department,ReportsToEmail
+Alice Smith,CEO,alice@company.com,Executive,
+Bob Jones,Engineering Manager,bob@company.com,Engineering,alice@company.com
+Charlie Brown,Software Engineer,charlie@company.com,Engineering,bob@company.com
+Diana Prince,HR Director,diana@company.com,Human Resources,alice@company.com
+Evan Davis,Marketing Lead,evan@company.com,Marketing,alice@company.com

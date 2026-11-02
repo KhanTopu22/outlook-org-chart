@@ -1,32 +1,33 @@
-# React + TypeScript + Vite
+# Interactive Org Chart for Outlook
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+An Outlook add-in that lets you pick email recipients from your organization chart. Select someone and their managers can be added to Cc automatically.
 
-Currently, two official plugins are available:
+There is no backend. The directory, favorites and recent contacts are stored in the browser's `localStorage`, so they stay on the device.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- Add people by hand, paste CSV text, or upload an Excel/CSV file
+- Browse by department or as a reporting tree
+- Add selected people to To and Cc while composing an email
+- Favorites and recently used contacts
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Import format
 
-## Expanding the Oxlint configuration
+Columns: `Name, Title, Email, Department, ReportsToEmail`
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+Name and Email are required. Rows without a valid email are skipped. `ReportsToEmail` also accepts the manager's name if it matches someone in the directory. See [public/template_excel.csv](public/template_excel.csv) for an example.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+## Development
+
+```sh
+npm install
+npm run dev     # https://localhost:3000
+npm run build
+npm run lint
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+`xlsx` is installed from the SheetJS CDN because the version on npm is outdated and has known vulnerabilities.
+
+## Deployment
+
+Pushing to `main` deploys to GitHub Pages through [.github/workflows/deploy.yml](.github/workflows/deploy.yml). [manifest.xml](manifest.xml) points at the deployed URLs and is the file to sideload into Outlook or submit to AppSource.

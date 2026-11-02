@@ -4,7 +4,6 @@ import {
   CheckCircle2, XCircle, Check, Building2,
   ChevronDown, ChevronRight, Star, History
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import './index.css';
 
 // Types
@@ -20,10 +19,27 @@ interface Person {
 type TabType = 'create' | 'use';
 type ViewMode = 'department' | 'orgchart';
 
+const loadSavedList = <T,>(key: string): T[] => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) ?? '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    console.error(`Failed to parse saved ${key}`);
+    return [];
+  }
+};
+
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const sameEmail = (a: string, b?: string) => a.toLowerCase() === b?.toLowerCase();
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('use');
   const [viewMode, setViewMode] = useState<ViewMode>('department');
-  const [orgData, setOrgData] = useState<Person[]>([]);
+  const [orgData, setOrgData] = useState<Person[]>(() =>
+    // Older versions saved Human Resources as HR
+    loadSavedList<Person>('orgChartData').map(p => p.department === 'HR' ? { ...p, department: 'Human Resources' } : p)
+  );
   const [selectedTo, setSelectedTo] = useState<Person[]>([]);
   const [selectedCc, setSelectedCc] = useState<Person[]>([]);
   const [ccAncestors, setCcAncestors] = useState(true);
@@ -38,8 +54,8 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Favorites & Recents state
-  const [favorites, setFavorites] = useState<string[]>([]);
-  const [recentContacts, setRecentContacts] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<string[]>(() => loadSavedList<string>('orgChartFavorites'));
+  const [recentContacts, setRecentContacts] = useState<string[]>(() => loadSavedList<string>('orgChartRecents'));
 
   // Accordion state
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -52,31 +68,8 @@ export default function App() {
   });
 
   useEffect(() => {
-    const saved = localStorage.getItem('orgChartData');
-    if (saved) {
-      try {
-        setOrgData(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse saved org chart data");
-      }
-    }
-    const savedFavorites = localStorage.getItem('orgChartFavorites');
-    if (savedFavorites) {
-      try {
-        setFavorites(JSON.parse(savedFavorites));
-      } catch (e) {
-        console.error("Failed to parse saved favorites");
-      }
-    }
-    const savedRecents = localStorage.getItem('orgChartRecents');
-    if (savedRecents) {
-      try {
-        setRecentContacts(JSON.parse(savedRecents));
-      } catch (e) {
-        console.error("Failed to parse saved recents");
-      }
-    }
-  }, []);
+    localStorage.setItem('orgChartData', JSON.stringify(orgData));
+  }, [orgData]);
 
   useEffect(() => {
     localStorage.setItem('orgChartFavorites', JSON.stringify(favorites));
@@ -93,31 +86,66 @@ export default function App() {
     }, 3000);
   };
 
-  const saveOrgChart = () => {
-    localStorage.setItem('orgChartData', JSON.stringify(orgData));
-    showToast('Organization chart saved successfully', 'success');
-  };
-
   const addPerson = () => {
-    if (!name || !email) {
+    const trimmedEmail = email.trim();
+
+    if (!name.trim() || !trimmedEmail) {
       showToast('Please enter at least name and email', 'error');
       return;
     }
 
-    if (orgData.some(p => p.email.toLowerCase() === email.toLowerCase())) {
+    if (!isValidEmail(trimmedEmail)) {
+      showToast('Please enter a valid email address', 'error');
+      return;
+    }
+
+    if (orgData.some(p => sameEmail(p.email, trimmedEmail))) {
       showToast('Person with this email already exists', 'error');
       return;
     }
 
     const newPerson: Person = {
       id: Date.now().toString(),
-      name, title, email, department, reportsTo
+      name: name.trim(), title, email: trimmedEmail, department, reportsTo
     };
-    
+
     setOrgData([...orgData, newPerson]);
     setName(''); setTitle(''); setEmail(''); setDepartment(''); setReportsTo('');
     showToast('Person added successfully', 'success');
   };
+
+  // Adds rows that have a name and a real email; returns how many were added and how many were invalid
+  const mergePeople = (rows: Omit<Person, 'id'>[]) => {
+    const newOrgData = [...orgData];
+    let imported = 0;
+    let invalid = 0;
+
+    rows.forEach(row => {
+      if (!row.name || !isValidEmail(row.email)) {
+        invalid++;
+      } else if (!newOrgData.some(p => sameEmail(p.email, row.email))) {
+        newOrgData.push({
+          ...row,
+          id: Date.now().toString() + Math.random(),
+          department: row.department || 'Other'
+        });
+        imported++;
+      }
+    });
+
+    // A manager column may hold a name instead of an email
+    const resolved = newOrgData.map(p => {
+      if (!p.reportsTo || isValidEmail(p.reportsTo)) return p;
+      const manager = newOrgData.find(m => m.name.toLowerCase() === p.reportsTo?.toLowerCase());
+      return manager ? { ...p, reportsTo: manager.email } : p;
+    });
+
+    if (imported > 0) setOrgData(resolved);
+    return { imported, invalid };
+  };
+
+  const importSummary = (imported: number, invalid: number) =>
+    `Imported ${imported} people` + (invalid > 0 ? `, skipped ${invalid} without a valid name and email` : '');
 
   const importData = () => {
     if (!importText.trim()) {
@@ -125,35 +153,24 @@ export default function App() {
       return;
     }
 
-    const lines = importText.trim().split('\n');
-    let imported = 0;
-    const newOrgData = [...orgData];
-
-    lines.forEach((line) => {
+    const rows = importText.trim().split('\n').map(line => {
       const parts = line.split(',').map(part => part.trim());
-      if (parts.length >= 2 && parts[0] && parts[1]) {
-        const pEmail = parts[2] || parts[0].toLowerCase().replace(/\s+/g, '.') + '@company.com';
-
-        if (!newOrgData.some(p => p.email.toLowerCase() === pEmail.toLowerCase())) {
-          newOrgData.push({
-            id: Date.now().toString() + Math.random(),
-            name: parts[0],
-            title: parts[1],
-            email: pEmail,
-            department: parts[3] || 'Other',
-            reportsTo: parts[4] || ''
-          });
-          imported++;
-        }
-      }
+      return {
+        name: parts[0] || '',
+        title: parts[1] || '',
+        email: parts[2] || '',
+        department: parts[3] || '',
+        reportsTo: parts[4] || ''
+      };
     });
 
+    const { imported, invalid } = mergePeople(rows);
+
     if (imported > 0) {
-      setOrgData(newOrgData);
       setImportText('');
-      showToast(`Imported ${imported} people`, 'success');
+      showToast(importSummary(imported, invalid), 'success');
     } else {
-      showToast('No valid new data to import', 'error');
+      showToast('No valid new data to import. Each line needs a name and an email.', 'error');
     }
   };
 
@@ -164,8 +181,9 @@ export default function App() {
       
       if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')) {
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = async (event) => {
           try {
+            const XLSX = await import('xlsx');
             const data = new Uint8Array(event.target?.result as ArrayBuffer);
             const workbook = XLSX.read(data, { type: 'array' });
             const firstSheetName = workbook.SheetNames[0];
@@ -174,56 +192,37 @@ export default function App() {
             // Convert to JSON array
             const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' }) as any[];
             
-            let importedCount = 0;
-            const newOrgData = [...orgData];
-            
-            jsonData.forEach(row => {
+            const rows = jsonData.map(row => {
               // Standardize column names (allow lowercase/spaces in headers)
               const getCol = (names: string[]) => {
                 const key = Object.keys(row).find(k => names.some(n => k.toLowerCase().replace(/\s+/g, '') === n.toLowerCase()));
-                return key ? row[key] : '';
+                return key ? String(row[key]).trim() : '';
               };
-              
-              const name = getCol(['name', 'fullname', 'employee']);
-              const title = getCol(['title', 'jobtitle', 'position', 'role']);
-              let pEmail = getCol(['email', 'emailaddress']);
-              const department = getCol(['department', 'dept', 'team']);
-              const reportsTo = getCol(['reportstoemail', 'manager', 'manageremail', 'reportsto']);
-              
-              if (name) {
-                if (!pEmail) {
-                  pEmail = String(name).toLowerCase().replace(/\s+/g, '.') + '@company.com';
-                }
-                
-                // Avoid duplicates
-                if (!newOrgData.some(p => p.email.toLowerCase() === String(pEmail).toLowerCase())) {
-                  newOrgData.push({
-                    id: Date.now().toString() + Math.random(),
-                    name: String(name),
-                    title: String(title),
-                    email: String(pEmail),
-                    department: String(department) || 'Other',
-                    reportsTo: String(reportsTo)
-                  });
-                  importedCount++;
-                }
-              }
+
+              return {
+                name: getCol(['name', 'fullname', 'employee']),
+                title: getCol(['title', 'jobtitle', 'position', 'role']),
+                email: getCol(['email', 'emailaddress']),
+                department: getCol(['department', 'dept', 'team']),
+                reportsTo: getCol(['reportstoemail', 'manager', 'manageremail', 'reportsto'])
+              };
             });
-            
-            if (importedCount > 0) {
-              setOrgData(newOrgData);
-              showToast(`Successfully imported ${importedCount} people from ${file.name}`, 'success');
+
+            const { imported, invalid } = mergePeople(rows);
+
+            if (imported > 0) {
+              showToast(`${importSummary(imported, invalid)} from ${file.name}`, 'success');
             } else {
               showToast('No new valid entries found in the file.', 'error');
             }
           } catch (err) {
             console.error(err);
-            showToast('Error parsing file. Please make sure it matches the template.', 'error');
+            showToast('Error parsing file. Expected columns: Name, Title, Email, Department, ReportsToEmail.', 'error');
           }
         };
         reader.readAsArrayBuffer(file);
       } else {
-         showToast(`File ${file.name} format parsing is limited to Excel/CSV right now. Word/Visio parsing coming soon.`, 'info');
+         showToast(`${file.name} is not supported. Please upload an Excel or CSV file.`, 'error');
       }
       e.target.value = '';
     }
@@ -242,16 +241,34 @@ export default function App() {
       setOrgData([]);
       setSelectedTo([]);
       setSelectedCc([]);
-      localStorage.removeItem('orgChartData');
       showToast('All data cleared', 'info');
     }
   };
 
   const getAllAncestors = (person: Person, allData: Person[]): Person[] => {
-    if (!person.reportsTo) return [];
-    const manager = allData.find(p => p.email === person.reportsTo);
-    if (!manager) return [];
-    return [manager, ...getAllAncestors(manager, allData)];
+    const ancestors: Person[] = [];
+    const seen = new Set([person.id]);
+    let manager = allData.find(p => sameEmail(p.email, person.reportsTo));
+    // Imported data can contain reporting loops, so stop at the first repeat
+    while (manager && !seen.has(manager.id)) {
+      seen.add(manager.id);
+      ancestors.push(manager);
+      const reportsTo = manager.reportsTo;
+      manager = allData.find(p => sameEmail(p.email, reportsTo));
+    }
+    return ancestors;
+  };
+
+  // Removes people from To and Cc, along with managers who were only Cc'd because of them
+  const removeFromSelection = (people: Person[]) => {
+    const ids = new Set(people.map(p => p.id));
+    const remainingTo = selectedTo.filter(p => !ids.has(p.id));
+    const ancestorIds = (list: Person[]) => new Set(list.flatMap(p => getAllAncestors(p, orgData)).map(a => a.id));
+    const noLongerNeeded = ancestorIds(people);
+    const stillNeeded = ancestorIds(remainingTo);
+
+    setSelectedTo(remainingTo);
+    setSelectedCc(selectedCc.filter(c => !ids.has(c.id) && (!noLongerNeeded.has(c.id) || stillNeeded.has(c.id))));
   };
 
   const toggleFavorite = (e: React.MouseEvent, email: string) => {
@@ -273,7 +290,7 @@ export default function App() {
   const handlePersonClick = (person: Person, listType?: 'to' | 'cc') => {
     trackRecentAccess(person.email);
     if (listType === 'to') {
-      setSelectedTo(selectedTo.filter(p => p.id !== person.id));
+      removeFromSelection([person]);
     } else if (listType === 'cc') {
       setSelectedCc(selectedCc.filter(p => p.id !== person.id));
     } else {
@@ -281,8 +298,7 @@ export default function App() {
       const inCc = selectedCc.some(p => p.id === person.id);
       
       if (inTo || inCc) {
-        setSelectedTo(selectedTo.filter(p => p.id !== person.id));
-        setSelectedCc(selectedCc.filter(p => p.id !== person.id));
+        removeFromSelection([person]);
       } else {
         setSelectedTo([...selectedTo, person]);
         if (ccAncestors) {
@@ -297,7 +313,7 @@ export default function App() {
     }
   };
 
-  const addToEmail = () => {
+  const addToEmail = async () => {
     if (selectedTo.length === 0 && selectedCc.length === 0) {
       showToast('No recipients selected', 'error');
       return;
@@ -315,38 +331,37 @@ export default function App() {
 
     if (window.Office && window.Office.context && window.Office.context.mailbox) {
       const item = window.Office.context.mailbox.item;
-      
-      let addedTo = false;
-      let addedCc = false;
-      
-      const checkCompletion = () => {
-        if ((toRecipients.length === 0 || addedTo) && (ccRecipients.length === 0 || addedCc)) {
-          showToast(`Added ${toRecipients.length} TO and ${ccRecipients.length} CC recipients`, 'success');
-          setSelectedTo([]);
-          setSelectedCc([]);
-        }
-      };
 
-      if (toRecipients.length > 0) {
-        item.to.addAsync(toRecipients, (result: any) => {
-          if (result.status === window.Office.AsyncResultStatus.Succeeded) {
-             addedTo = true;
-             checkCompletion();
-          } else {
-             showToast('Error adding TO recipients', 'error');
-          }
-        });
+      // Recipients can only be added while composing; in read mode item.to is a plain array
+      if (!item?.to?.addAsync) {
+        showToast('Open a new email or reply to add recipients', 'info');
+        return;
       }
-      
-      if (ccRecipients.length > 0) {
-        item.cc.addAsync(ccRecipients, (result: any) => {
-          if (result.status === window.Office.AsyncResultStatus.Succeeded) {
-             addedCc = true;
-             checkCompletion();
-          } else {
-             showToast('Error adding CC recipients', 'error');
+
+      const addRecipients = (field: any, recipients: typeof toRecipients) =>
+        new Promise<boolean>(resolve => {
+          if (recipients.length === 0) {
+            resolve(true);
+            return;
           }
+          field.addAsync(recipients, (result: any) => {
+            resolve(result.status === window.Office.AsyncResultStatus.Succeeded);
+          });
         });
+
+      const [addedTo, addedCc] = await Promise.all([
+        addRecipients(item.to, toRecipients),
+        addRecipients(item.cc, ccRecipients)
+      ]);
+
+      // Keep only what failed selected, so a retry doesn't add the rest twice
+      if (addedTo) setSelectedTo([]);
+      if (addedCc) setSelectedCc([]);
+
+      if (addedTo && addedCc) {
+        showToast(`Added ${toRecipients.length} TO and ${ccRecipients.length} CC recipients`, 'success');
+      } else {
+        showToast(`Error adding ${addedTo ? 'CC' : addedCc ? 'TO' : 'TO and CC'} recipients`, 'error');
       }
     } else {
       // Not running in Outlook
@@ -359,14 +374,16 @@ export default function App() {
   const selectDepartment = (_dept: string, peopleInDept: Person[]) => {
     const allSelected = peopleInDept.every(p => selectedTo.some(sp => sp.id === p.id));
     if (allSelected) {
-      const idsToRemove = new Set(peopleInDept.map(p => p.id));
-      setSelectedTo(selectedTo.filter(p => !idsToRemove.has(p.id)));
-      setSelectedCc(selectedCc.filter(p => !idsToRemove.has(p.id)));
+      removeFromSelection(peopleInDept);
     } else {
       const currentlySelectedIds = new Set(selectedTo.map(p => p.id));
       const newPeople = peopleInDept.filter(p => !currentlySelectedIds.has(p.id));
       setSelectedTo([...selectedTo, ...newPeople]);
-      
+
+      // Anyone moving to To shouldn't stay in Cc as well
+      const newIds = new Set(newPeople.map(p => p.id));
+      setSelectedCc(prev => prev.filter(c => !newIds.has(c.id)));
+
       if (ccAncestors) {
         const allAncestors = newPeople.flatMap(p => getAllAncestors(p, orgData));
         const uniqueAncestors = Array.from(new Map(allAncestors.map(a => [a.id, a])).values());
@@ -394,6 +411,9 @@ export default function App() {
     acc[dept].push(person);
     return acc;
   }, {} as Record<string, Person[]>);
+
+  // Shared across the tree render so reporting loops can't recurse forever or hide people
+  const renderedInTree = new Set<Person['id']>();
 
   return (
     <>
@@ -455,7 +475,7 @@ export default function App() {
                     <option value="Engineering">Engineering</option>
                     <option value="Sales">Sales</option>
                     <option value="Marketing">Marketing</option>
-                    <option value="HR">Human Resources</option>
+                    <option value="Human Resources">Human Resources</option>
                     <option value="Finance">Finance</option>
                     <option value="Operations">Operations</option>
                   </select>
@@ -498,16 +518,16 @@ export default function App() {
                   <Upload size={16} /> Import Text Data
                 </button>
 
-                <div style={{ marginBottom: '12px', fontSize: '13px', fontWeight: '500' }}>Option 2: Upload file (Excel, Word, Visio)</div>
+                <div style={{ marginBottom: '12px', fontSize: '13px', fontWeight: '500' }}>Option 2: Upload file (Excel or CSV)</div>
                 <div className="form-group">
                   <input 
                     type="file" 
-                    accept=".xlsx, .xls, .docx, .doc, .vsdx, .csv" 
+                    accept=".xlsx, .xls, .csv"
                     className="form-input" 
                     style={{ padding: '10px' }}
                     onChange={handleFileUpload} 
                   />
-                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>Upload your existing organization charts to import automatically.</p>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>Columns: Name, Title, Email, Department, ReportsToEmail. Name and Email are required.</p>
                 </div>
               </div>
             )}
@@ -527,7 +547,7 @@ export default function App() {
             
             {isDirectoryOpen && (
               <div className="collapsible-content">
-                <div className="person-list" style={{ marginBottom: '16px' }}>
+                <div className="person-list">
                   {orgData.length === 0 ? (
                     <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>No people in directory</p>
                   ) : (
@@ -545,10 +565,6 @@ export default function App() {
                     ))
                   )}
                 </div>
-                
-                <button className="btn btn-success btn-full" onClick={saveOrgChart} disabled={orgData.length === 0}>
-                  <CheckCircle2 size={16} /> Save Directory
-                </button>
               </div>
             )}
           </div>
@@ -720,9 +736,14 @@ export default function App() {
                   <div className="tree-node root-node">
                     <div className="tree-card root-card">Company</div>
                     <div className="tree-children">
-                      {orgData.filter(p => !p.reportsTo || !orgData.some(other => other.email === p.reportsTo)).map(root => {
+                      {[
+                        ...filteredData.filter(p => !filteredData.some(other => sameEmail(other.email, p.reportsTo))),
+                        ...filteredData
+                      ].map(root => {
                         const renderTree = (person: Person) => {
-                          const children = orgData.filter(p => p.reportsTo === person.email);
+                          renderedInTree.add(person.id);
+                          const children = filteredData.filter(p => sameEmail(person.email, p.reportsTo) && !renderedInTree.has(p.id));
+                          children.forEach(child => renderedInTree.add(child.id));
                           const isSelected = selectedTo.some(p => p.id === person.id) || selectedCc.some(p => p.id === person.id);
                           return (
                             <div className="tree-node person-node" key={person.id}>
@@ -736,7 +757,6 @@ export default function App() {
                                 </button>
                                 <span className="person-name">{person.name}</span>
                                 <span className="person-title">{person.title}</span>
-                                {children.length > 0 && <span className="dept-select-hint">(Select team)</span>}
                               </div>
                               {children.length > 0 && (
                                 <div className="tree-children">
@@ -746,7 +766,7 @@ export default function App() {
                             </div>
                           );
                         };
-                        return renderTree(root);
+                        return renderedInTree.has(root.id) ? null : renderTree(root);
                       })}
                     </div>
                   </div>
